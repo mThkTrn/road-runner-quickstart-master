@@ -15,9 +15,9 @@ public class MotorTestTeleOp extends OpMode {
     public void init() {
         // Initialize hardware
         leftFront = hardwareMap.get(DcMotor.class, "leftFront");
-        leftRear = hardwareMap.get(DcMotor.class, "leftRear");
+        leftRear = hardwareMap.get(DcMotor.class, "leftBack");
         rightFront = hardwareMap.get(DcMotor.class, "rightFront");
-        rightRear = hardwareMap.get(DcMotor.class, "rightRear");
+        rightRear = hardwareMap.get(DcMotor.class, "rightBack");
 
         // Set motor direction if needed (adjust for your robot configuration)
         leftFront.setDirection(DcMotor.Direction.FORWARD);
