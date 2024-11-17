@@ -1,93 +1,103 @@
 package org.firstinspires.ftc.teamcode;
 
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
-@TeleOp(name = "Motor Test TeleOp", group = "Test")
-public class MotorTestTeleOp extends OpMode {
-    private DcMotor frontLeft;
-    private DcMotor frontRight;
-    private DcMotor backLeft;
-    private DcMotor backRight;
+@TeleOp(name = "Mecanum Drive Test", group = "Test")
+public class MecanumDriveTest extends OpMode {
+    private DcMotor leftFront, leftRear, rightFront, rightRear;
+    private ElapsedTime runtime = new ElapsedTime();
 
     @Override
     public void init() {
-        // Initialize motors
-        frontLeft = hardwareMap.get(DcMotor.class, "frontLeft");
-        frontRight = hardwareMap.get(DcMotor.class, "frontRight");
-        backLeft = hardwareMap.get(DcMotor.class, "backLeft");
-        backRight = hardwareMap.get(DcMotor.class, "backRight");
+        // Initialize hardware
+        leftFront = hardwareMap.get(DcMotor.class, "leftFront");
+        leftRear = hardwareMap.get(DcMotor.class, "leftRear");
+        rightFront = hardwareMap.get(DcMotor.class, "rightFront");
+        rightRear = hardwareMap.get(DcMotor.class, "rightRear");
 
-        // Set motor directions if necessary (optional)
-        frontLeft.setDirection(DcMotor.Direction.FORWARD);
-        frontRight.setDirection(DcMotor.Direction.REVERSE);  // If needed
-        backLeft.setDirection(DcMotor.Direction.FORWARD);
-        backRight.setDirection(DcMotor.Direction.REVERSE);  // If needed
+        // Set motor direction if needed (adjust for your robot configuration)
+        leftFront.setDirection(DcMotor.Direction.FORWARD);
+        leftRear.setDirection(DcMotor.Direction.REVERSE);
+        rightFront.setDirection(DcMotor.Direction.FORWARD);
+        rightRear.setDirection(DcMotor.Direction.REVERSE);
+
+        // Set motors to brake mode when power is zero
+        leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        leftRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightRear.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         telemetry.addData("Status", "Initialized");
         telemetry.update();
     }
 
     @Override
+    public void start() {
+        runtime.reset();
+    }
+
+    @Override
     public void loop() {
-        // Test the motors sequentially with gamepad buttons
+        // Test front left motor
+        leftFront.setPower(1.0);
+        leftRear.setPower(0.0);
+        rightFront.setPower(0.0);
+        rightRear.setPower(0.0);
+        sleep(2000);  // Run front left for 2 seconds
 
-        // If the A button is pressed, run the front left motor
-        if (gamepad1.a) {
-            frontLeft.setPower(1.0);
-            frontRight.setPower(0.0);
-            backLeft.setPower(0.0);
-            backRight.setPower(0.0);
-            telemetry.addData("Motor Test", "Running Front Left");
-        } 
-        // If the B button is pressed, run the front right motor
-        else if (gamepad1.b) {
-            frontLeft.setPower(0.0);
-            frontRight.setPower(1.0);
-            backLeft.setPower(0.0);
-            backRight.setPower(0.0);
-            telemetry.addData("Motor Test", "Running Front Right");
-        } 
-        // If the X button is pressed, run the back right motor
-        else if (gamepad1.x) {
-            frontLeft.setPower(0.0);
-            frontRight.setPower(0.0);
-            backLeft.setPower(0.0);
-            backRight.setPower(1.0);
-            telemetry.addData("Motor Test", "Running Back Right");
-        } 
-        // If the Y button is pressed, run the back left motor
-        else if (gamepad1.y) {
-            frontLeft.setPower(0.0);
-            frontRight.setPower(0.0);
-            backLeft.setPower(1.0);
-            backRight.setPower(0.0);
-            telemetry.addData("Motor Test", "Running Back Left");
-        } 
-        // If no button is pressed, stop all motors
-        else {
-            frontLeft.setPower(0.0);
-            frontRight.setPower(0.0);
-            backLeft.setPower(0.0);
-            backRight.setPower(0.0);
-            telemetry.addData("Motor Test", "Stopped");
-        }
+        // Test front right motor
+        leftFront.setPower(0.0);
+        leftRear.setPower(0.0);
+        rightFront.setPower(1.0);
+        rightRear.setPower(0.0);
+        sleep(2000);  // Run front right for 2 seconds
 
-        // Update telemetry to show the status
-        telemetry.addData("Front Left Power", frontLeft.getPower());
-        telemetry.addData("Front Right Power", frontRight.getPower());
-        telemetry.addData("Back Left Power", backLeft.getPower());
-        telemetry.addData("Back Right Power", backRight.getPower());
+        // Test back right motor
+        leftFront.setPower(0.0);
+        leftRear.setPower(0.0);
+        rightFront.setPower(0.0);
+        rightRear.setPower(1.0);
+        sleep(2000);  // Run back right for 2 seconds
+
+        // Test back left motor
+        leftFront.setPower(0.0);
+        leftRear.setPower(1.0);
+        rightFront.setPower(0.0);
+        rightRear.setPower(0.0);
+        sleep(2000);  // Run back left for 2 seconds
+
+        // Stop all motors after the test
+        leftFront.setPower(0);
+        leftRear.setPower(0);
+        rightFront.setPower(0);
+        rightRear.setPower(0);
+
+        // Telemetry output
+        telemetry.addData("Status", "Test Completed");
         telemetry.update();
     }
 
     @Override
     public void stop() {
-        // Stop all motors at the end of the teleop period
-        frontLeft.setPower(0.0);
-        frontRight.setPower(0.0);
-        backLeft.setPower(0.0);
-        backRight.setPower(0.0);
+        // Stop all motors
+        leftFront.setPower(0);
+        leftRear.setPower(0);
+        rightFront.setPower(0);
+        rightRear.setPower(0);
+        telemetry.addData("Status", "Stopped");
+        telemetry.update();
+    }
+
+    // Sleep helper function
+    private void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }
