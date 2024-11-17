@@ -7,7 +7,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 
 @TeleOp(name = "Mecanum Drive Test", group = "Test")
-public class MecanumDriveTest extends OpMode {
+public class MotorTestTeleOp extends OpMode {
     private DcMotor leftFront, leftRear, rightFront, rightRear;
     private ElapsedTime runtime = new ElapsedTime();
 
