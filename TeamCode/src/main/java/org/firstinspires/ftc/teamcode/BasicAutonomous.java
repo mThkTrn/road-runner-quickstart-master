@@ -1,141 +1,159 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.CRServo;
 
-@Autonomous(name = "Simple Autonomous", group = "Simple")
-public class BasicAutonomous extends OpMode {
+@Autonomous(name = "Concurrent Autonomous with Sequential Intake", group = "Simple")
+public class BasicAutonomous extends LinearOpMode {
 
-    // Motors and servos for the robot
+    // -------------------- CONSTANTS --------------------
+    private static final boolean USE_DEAD_WHEELS = false; // Toggle between encoder-based and time-based movement
+
+    // **General Movement Parameters**
+    private static final double WHEEL_DIAMETER_MM = 48.0;
+    private static final double TICKS_PER_REV = 1440;
+    private static final double DISTANCE_TO_TRAVEL_MM = 1000.0;
+    private static final double DRIVE_TIME_SEC = 2.0;
+
+    // **Arm Parameters**
+    private static final double ARM_MOVE_DURATION_SEC = 2.0;
+    private static final double ARM_POWER = 1;
+
+    // **Arm Swing Parameters (DC Motor)**
+    private static final double ARM_SWING_DURATION_SEC = 1.5;
+    private static final double ARM_SWING_POWER = 0.5;
+
+    // **Intake Parameters**
+    private static final double INTAKE_DURATION_SEC = 2.0;
+    private static final double INTAKE_POWER = 1.0;
+
+    // -------------------- HARDWARE DECLARATIONS --------------------
     private DcMotor leftFront, leftBack, rightFront, rightBack;
-    private DcMotor linearSlide;
-    private Servo armSwing;
-    private Servo intake;
+    private DcMotor armLeft, armRight;
+    private DcMotor armSwing;
+    private CRServo intakeServo;
 
-    // Parameters for autonomous actions
-    private double driveTime = 2.0; // Time to drive forward (in seconds)
-    private double slidePosition = 500; // Target position for the linear slide (in encoder ticks)
-    private double armSwingTime = 1.5; // Time to move the arm swing (in seconds)
-    private double intakeDuration = 2.0; // Time to run the intake (in seconds)
-
-    private double startTime = 0; // Start time for the autonomous actions
-    private boolean isDriving = false;
-    private boolean isLinearSlideMoving = false;
-    private boolean isArmSwingMoving = false;
-    private boolean isIntakeRunning = false;
+    private static final double DISTANCE_PER_TICK = WHEEL_DIAMETER_MM * Math.PI / TICKS_PER_REV;
 
     @Override
-    public void init() {
-        // Initialize motors and servos
+    public void runOpMode() {
+        // -------------------- INITIALIZE HARDWARE --------------------
         leftFront = hardwareMap.get(DcMotor.class, "leftFront");
         leftBack = hardwareMap.get(DcMotor.class, "leftBack");
         rightFront = hardwareMap.get(DcMotor.class, "rightFront");
         rightBack = hardwareMap.get(DcMotor.class, "rightBack");
-        linearSlide = hardwareMap.get(DcMotor.class, "linearSlide");
-        armSwing = hardwareMap.get(Servo.class, "armSwing");
-        intake = hardwareMap.get(Servo.class, "intake");
+        armLeft = hardwareMap.get(DcMotor.class, "armLeft");
+        armRight = hardwareMap.get(DcMotor.class, "armRight");
+        armSwing = hardwareMap.get(DcMotor.class, "armSwing");
+        intakeServo = hardwareMap.get(CRServo.class, "intakeServo");
 
-        // Set the motors to brake when stopped
-        leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        leftBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rightBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        setMotorBrakeMode(leftFront);
+        setMotorBrakeMode(leftBack);
+        setMotorBrakeMode(rightFront);
+        setMotorBrakeMode(rightBack);
+        setMotorBrakeMode(armSwing);
 
-        // Initialize the servo positions
-        armSwing.setPosition(0.5);  // Default position for the arm swing (adjust as needed)
-        intake.setPosition(0);      // Intake off initially
+        intakeServo.setPower(0);
+
+        telemetry.addData("Status", "Initialized");
+        telemetry.update();
+
+        waitForStart();
+
+        if (opModeIsActive()) {
+            // -------------------- START CONCURRENT ACTIONS --------------------
+
+            // Start drive, arm, and arm swing concurrently
+            driveForward();
+            moveArm();
+            moveArmSwing();
+
+            // Ensure all concurrent tasks have finished before intake starts
+            sleep((long) (Math.max(DRIVE_TIME_SEC, Math.max(ARM_MOVE_DURATION_SEC, ARM_SWING_DURATION_SEC)) * 1000));
+
+            // -------------------- INTAKE PHASE --------------------
+            runIntake();
+
+            // Stop everything after the intake finishes
+            stopAll();
+        }
     }
 
-    @Override
-    public void start() {
-        startTime = getRuntime();
+    // -------------------- CONCURRENT ACTIONS --------------------
+
+    private void driveForward() {
+        if (USE_DEAD_WHEELS) {
+            int targetTicks = (int) (DISTANCE_TO_TRAVEL_MM / DISTANCE_PER_TICK);
+            resetDriveEncoders();
+            setDrivePower(0.5);
+        } else {
+            setDrivePower(0.5);
+            sleep((long) (DRIVE_TIME_SEC * 1000));
+            stopDriving();
+        }
     }
 
-    @Override
-    public void loop() {
-        double currentTime = getRuntime() - startTime;
+    private void moveArm() {
+        armLeft.setPower(ARM_POWER);
+        armRight.setPower(-ARM_POWER);
+        sleep((long) (ARM_MOVE_DURATION_SEC * 1000));
+        armLeft.setPower(0);
+        armRight.setPower(0);
+    }
 
-        // Drive forward for the specified time
-        if (!isDriving) {
-            isDriving = true;
-            leftFront.setPower(0.5);
-            leftBack.setPower(0.5);
-            rightFront.setPower(0.5);
-            rightBack.setPower(0.5);
-        }
+    private void moveArmSwing() {
+        armSwing.setPower(-ARM_SWING_POWER);
+        sleep((long) (ARM_SWING_DURATION_SEC * 1000));
+        armSwing.setPower(0);
+    }
 
-        if (currentTime > driveTime && isDriving) {
-            // Stop the robot after the set time
-            leftFront.setPower(0);
-            leftBack.setPower(0);
-            rightFront.setPower(0);
-            rightBack.setPower(0);
-            isDriving = false;
-        }
+    // -------------------- SEQUENTIAL ACTION --------------------
 
-        // Move the linear slide to the specified position
-        if (!isLinearSlideMoving && !isDriving) {
-            isLinearSlideMoving = true;
-            linearSlide.setTargetPosition((int) slidePosition);
-            linearSlide.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            linearSlide.setPower(0.8);  // Set the speed of the linear slide
-        }
+    private void runIntake() {
+        intakeServo.setPower(INTAKE_POWER);
+        sleep((long) (INTAKE_DURATION_SEC * 1000));
+        intakeServo.setPower(0);
+    }
 
-        if (linearSlide.isBusy() && isLinearSlideMoving) {
-            // Wait until the linear slide reaches the target position
-            linearSlide.setPower(0.8);
-        } else if (!linearSlide.isBusy() && isLinearSlideMoving) {
-            // Once the slide reaches its position, stop
-            linearSlide.setPower(0);
-            isLinearSlideMoving = false;
-        }
+    // -------------------- STOP EVERYTHING --------------------
 
-        // Move the arm swing for a set time
-        if (!isArmSwingMoving && !isLinearSlideMoving && !isDriving) {
-            isArmSwingMoving = true;
-            armSwing.setPosition(1.0);  // Move arm swing to position (adjust as needed)
-        }
+    private void stopAll() {
+        stopDriving();
+        armLeft.setPower(0);
+        armRight.setPower(0);
+        armSwing.setPower(0);
+        intakeServo.setPower(0);
 
-        if (currentTime > driveTime + armSwingTime && isArmSwingMoving) {
-            armSwing.setPosition(0.5); // Return arm swing to original position
-            isArmSwingMoving = false;
-        }
-
-        // Run the intake for a specific duration
-        if (!isIntakeRunning && !isArmSwingMoving) {
-            isIntakeRunning = true;
-            intake.setPosition(1.0);  // Turn intake on (adjust servo position as needed)
-        }
-
-        if (currentTime > driveTime + armSwingTime + intakeDuration && isIntakeRunning) {
-            intake.setPosition(0);  // Turn intake off
-            isIntakeRunning = false;
-        }
-
-        // Provide telemetry
-        telemetry.addData("Drive Time", driveTime);
-        telemetry.addData("Slide Position", slidePosition);
-        telemetry.addData("Arm Swing Time", armSwingTime);
-        telemetry.addData("Intake Duration", intakeDuration);
-        telemetry.addData("Current Time", currentTime);
-        telemetry.addData("Is Driving", isDriving);
-        telemetry.addData("Is Linear Slide Moving", isLinearSlideMoving);
-        telemetry.addData("Is Arm Swing Moving", isArmSwingMoving);
-        telemetry.addData("Is Intake Running", isIntakeRunning);
+        telemetry.addData("Status", "All actions completed");
         telemetry.update();
     }
 
-    @Override
-    public void stop() {
-        // Stop all actions
+    // -------------------- HELPER METHODS --------------------
+
+    private void setMotorBrakeMode(DcMotor motor) {
+        motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+    }
+
+    private void resetDriveEncoders() {
+        leftFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rightFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        leftFront.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        rightFront.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+    }
+
+    private void setDrivePower(double power) {
+        leftFront.setPower(-power);
+        leftBack.setPower(-power);
+        rightFront.setPower(power);
+        rightBack.setPower(power);
+    }
+
+    private void stopDriving() {
         leftFront.setPower(0);
         leftBack.setPower(0);
         rightFront.setPower(0);
         rightBack.setPower(0);
-        linearSlide.setPower(0);
-        armSwing.setPosition(0.5);  // Set arm swing back to neutral
-        intake.setPosition(0);      // Turn intake off
     }
 }
