@@ -9,16 +9,21 @@ import com.qualcomm.robotcore.hardware.CRServo;
 public class BasicAutonomous extends LinearOpMode {
 
     // -------------------- CONSTANTS --------------------
-    private static final boolean USE_DEAD_WHEELS = true; // Toggle between encoder-based and time-based movement
+    private static final boolean USE_DEAD_WHEELS = false; // Toggle between encoder-based and time-based movement
     private static final double WHEEL_DIAMETER_MM = 48.0;
     private static final double TICKS_PER_REV = 1440;
     private static final double DISTANCE_TO_TRAVEL_MM = 1000.0;
-    private static final double DRIVE_TIME_SEC = 2.0;
-    
+    private static final double DRIVE_TIME_SEC_1 = 0; // First drive time (low speed)
+    private static final double DRIVE_TIME_SEC_2 = 0; // Second drive time (higher speed)
+
+    private static final double DRIVE_SPEED_LOW = 0.2; // Low drive speed
+    private static final double DRIVE_SPEED_HIGH = -0.5; // High drive speed
+
     // Arm parameters (time and encoder positions)
-    private static final int ARM_MOVE_POSITION = 500; // Example position (encoder ticks) for arm left and right
-    private static final int ARM_SWING_POSITION = 2000; // Example position (encoder ticks) for arm swing
-    private static final double ARM_POWER = 0.7;  // Motor power for arm movements
+    private static final int ARM_LEFT_POSITION = 2768; // Left arm target position
+    private static final int ARM_RIGHT_POSITION = 2493; // Right arm target position
+    private static final int ARM_SWING_POSITION = -2212; // Arm swing target position
+    private static final double ARM_POWER = 0.1;  // Motor power for arm movements
 
     private static final double INTAKE_DURATION_SEC = 2.0;
     private static final double INTAKE_POWER = 1.0;
@@ -52,6 +57,9 @@ public class BasicAutonomous extends LinearOpMode {
         setMotorBrakeMode(armRight);
         setMotorBrakeMode(armSwing);
 
+        armRight.setDirection(DcMotor.Direction.REVERSE);
+
+
         intakeServo.setPower(0);  // Initially stop intake
 
         // Reset arm motor encoders to 0 for a known starting position
@@ -64,54 +72,46 @@ public class BasicAutonomous extends LinearOpMode {
 
         if (opModeIsActive()) {
             // -------------------- START CONCURRENT ACTIONS --------------------
-            driveForward();
-            
-            // Move the arm motors concurrently (armLeft, armRight, armSwing)
-            moveArmToPositionConcurrently(ARM_MOVE_POSITION, ARM_SWING_POSITION);
+            // Drive forward at low speed for the first time duration
+            driveForward(DRIVE_SPEED_LOW, DRIVE_TIME_SEC_1);
 
-            // Ensure all concurrent tasks have finished before intake starts
+            // Drive forward at high speed for the second time duration
+            driveForward(DRIVE_SPEED_HIGH, DRIVE_TIME_SEC_2);
+
+            // Move the arm motors concurrently (armLeft, armRight, armSwing)
+            moveArmToPositionConcurrently(ARM_LEFT_POSITION, ARM_RIGHT_POSITION, ARM_SWING_POSITION);
+
+            // Ensure all concurrent tasks have finished before starting the intake
             sleep(3000);  // Adjust to the longest time for movement phases
 
             // -------------------- INTAKE PHASE --------------------
             runIntake();
 
-            // Stop everything after the intake finishes
+            // Stop all motors after the intake finishes
             stopAll();
         }
     }
 
     // -------------------- CONCURRENT ACTIONS --------------------
 
-    private void driveForward() {
-        if (USE_DEAD_WHEELS) {
-            int targetTicks = (int) (DISTANCE_TO_TRAVEL_MM / DISTANCE_PER_TICK);
-            resetDriveEncoders();
-            setDrivePower(0.5);
-            // Wait until the robot reaches the target distance (encoder-based movement)
-            while (opModeIsActive() && (Math.abs(leftFront.getCurrentPosition()) < targetTicks && Math.abs(rightFront.getCurrentPosition()) < targetTicks)) {
-                telemetry.addData("Driving", "Moving forward...");
-                telemetry.update();
-            }
-            stopDriving();
-        } else {
-            setDrivePower(0.5);
-            sleep((long) (DRIVE_TIME_SEC * 1000));
-            stopDriving();
-        }
+    private void driveForward(double speed, double timeSec) {
+        setDrivePower(speed);  // Set drive speed
+        sleep((long) (timeSec * 1000));  // Sleep for the given time in seconds
+        stopDriving();  // Stop after the time has elapsed
     }
 
-    private void moveArmToPositionConcurrently(int armPosition, int swingPosition) {
+    private void moveArmToPositionConcurrently(int armLeftPosition, int armRightPosition, int armSwingPosition) {
         // Set target positions for all motors (armLeft, armRight, armSwing)
-        armLeft.setTargetPosition(armPosition);
-        armRight.setTargetPosition(armPosition);
-        armSwing.setTargetPosition(swingPosition);
+        armLeft.setTargetPosition(armLeftPosition);
+        armRight.setTargetPosition(armRightPosition);
+        armSwing.setTargetPosition(armSwingPosition);
 
         // Set all motors to RUN_TO_POSITION mode
         armLeft.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         armRight.setMode(DcMotor.RunMode.RUN_TO_POSITION);
         armSwing.setMode(DcMotor.RunMode.RUN_TO_POSITION);
 
-        // Set power to all motors
+        // Set motor power to move arms
         armLeft.setPower(ARM_POWER);
         armRight.setPower(ARM_POWER);
         armSwing.setPower(ARM_POWER);
@@ -131,19 +131,19 @@ public class BasicAutonomous extends LinearOpMode {
     // -------------------- SEQUENTIAL ACTION --------------------
 
     private void runIntake() {
-        intakeServo.setPower(INTAKE_POWER);
-        sleep((long) (INTAKE_DURATION_SEC * 1000));
-        intakeServo.setPower(0);
+        intakeServo.setPower(INTAKE_POWER);  // Start intake
+        sleep((long) (INTAKE_DURATION_SEC * 1000));  // Run for the given duration
+        intakeServo.setPower(0);  // Stop intake
     }
 
     // -------------------- STOP EVERYTHING --------------------
 
     private void stopAll() {
-        stopDriving();
-        armLeft.setPower(0);
+        stopDriving();  // Stop the driving motors
+        armLeft.setPower(0);  // Stop arm motors
         armRight.setPower(0);
         armSwing.setPower(0);
-        intakeServo.setPower(0);
+        intakeServo.setPower(0);  // Stop intake servo
 
         telemetry.addData("Status", "All actions completed");
         telemetry.update();
@@ -152,10 +152,11 @@ public class BasicAutonomous extends LinearOpMode {
     // -------------------- HELPER METHODS --------------------
 
     private void setMotorBrakeMode(DcMotor motor) {
-        motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        motor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);  // Set brake mode when power is zero
     }
 
     private void resetDriveEncoders() {
+        // Reset drive motors encoders for consistent movement
         leftFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         rightFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         leftFront.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -163,17 +164,19 @@ public class BasicAutonomous extends LinearOpMode {
     }
 
     private void resetArmEncoders() {
+        // Reset arm motors encoders for a known starting position
         armLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         armRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         armSwing.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
-        // Set the motors to RUN_USING_ENCODER so that the encoders are actively used during operations
+        // Set the motors to RUN_USING_ENCODER mode so that encoders are used during movement
         armLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         armRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         armSwing.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
     }
 
     private void setDrivePower(double power) {
+        // Set power to all drive motors
         leftFront.setPower(-power);
         leftBack.setPower(-power);
         rightFront.setPower(power);
@@ -181,6 +184,7 @@ public class BasicAutonomous extends LinearOpMode {
     }
 
     private void stopDriving() {
+        // Stop all driving motors
         leftFront.setPower(0);
         leftBack.setPower(0);
         rightFront.setPower(0);
