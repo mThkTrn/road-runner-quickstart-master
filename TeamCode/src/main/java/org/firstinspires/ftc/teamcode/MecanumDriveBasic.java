@@ -32,6 +32,10 @@ public class MecanumDriveBasic extends OpMode {
     private int ARM_SWING_STORAGE_POSITION = 0;
     private int ARM_SWING_EXIT_ENTRY_POSITION = -2768;
 
+    private int ARM_RIGHT_LIN_SLIDE_BUCKET = 2585;
+
+    private int ARM_LEFT_LIN_SLIDE_BUCKET = 2585;
+
 
     @Override
     public void init() {
@@ -108,11 +112,17 @@ public class MecanumDriveBasic extends OpMode {
             intakeServo.setPower(0.0);
         }
 
+        // check if the preset was pressed for the linear slides
+        if (gamepad2.right_bumper) {
+            armRight.setTargetPosition(ARM_RIGHT_LIN_SLIDE_BUCKET);
+            armLeft.setTargetPosition(ARM_LEFT_LIN_SLIDE_BUCKET);
+        }
+
         // Arm control using gamepad 2 right joystick
         double armPower = gamepad2.right_stick_y;
         if (armLeftHasEncoder && armRightHasEncoder) {
-            armLeft.setTargetPosition(armLeft.getCurrentPosition() + (int)(armPower * 100));
-            armRight.setTargetPosition(armRight.getCurrentPosition() + (int)(armPower * 100));
+            armLeft.setTargetPosition(armLeft.getCurrentPosition() - (int)(armPower * 100));
+            armRight.setTargetPosition(armRight.getCurrentPosition() - (int)(armPower * 100));
             armLeft.setMode(DcMotor.RunMode.RUN_TO_POSITION);
             armRight.setMode(DcMotor.RunMode.RUN_TO_POSITION);
             armLeft.setPower(0.5);
@@ -121,6 +131,8 @@ public class MecanumDriveBasic extends OpMode {
             armLeft.setPower(armPower);
             armRight.setPower(armPower);
         }
+
+
 
         // Arm swing control with position targeting if encoder detected
         double armSwingInput = -gamepad2.left_stick_y;
@@ -165,15 +177,16 @@ public class MecanumDriveBasic extends OpMode {
         }
 
         // Check for preset position button presses and update the arm swing target
-        if (gamepad2.a) {
+        if (gamepad2.b) {
             armSwingTargetPosition = ARM_SWING_FLOOR;
-        } else if (gamepad2.b) {
+        } else if (gamepad2.y) {
             armSwingTargetPosition = ARM_SWING_CEIL;
         } else if (gamepad2.x) {
             armSwingTargetPosition = ARM_SWING_STORAGE_POSITION;
-        } else if (gamepad2.y) {
+        } else if (gamepad2.a) {
             armSwingTargetPosition = ARM_SWING_EXIT_ENTRY_POSITION;
         }
+
 
         // Arm swing control with preset position targeting
         if (armSwingHasEncoder) {
@@ -213,7 +226,7 @@ public class MecanumDriveBasic extends OpMode {
             telemetry.addData("Arm Swing Current Position", "N/A");
         }
 
-        // For armLeft
+        // For armLeft (linear slide)
         if (armLeftHasEncoder) {
             int currentPosition = armLeft.getCurrentPosition();
             telemetry.addData("Arm Left Target Position", armLeft.getTargetPosition());
