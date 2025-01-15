@@ -25,19 +25,22 @@ public class MecanumDriveBasic extends OpMode {
     private boolean armSwingHasEncoder = false;
 
     private static final int SWING_MIN_POSITION = -1000000000;
-    private static final int SWING_MAX_POSITION = 1000000000;
+    private static final int SWING_MAX_POSITION =  1000000000;
+
+    // Target position for the armSwing
     private int armSwingTargetPosition = 0;
+
+    // Arm swing preset positions
     private int ARM_SWING_FLOOR = -3168;
     private int ARM_SWING_CEIL = -2112;
     private int ARM_SWING_STORAGE_POSITION = 0;
     private int ARM_SWING_EXIT_ENTRY_POSITION = -2768;
 
+    // Linear slide presets
     private int ARM_RIGHT_LIN_SLIDE_BUCKET = 2585;
-
     private int ARM_LEFT_LIN_SLIDE_BUCKET = 2585;
 
     private boolean LINEAR_SLIDE_TARGET_REACHED = false;
-
 
     @Override
     public void init() {
@@ -45,10 +48,9 @@ public class MecanumDriveBasic extends OpMode {
         mecanumDrive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
 
         intakeServo = hardwareMap.get(CRServo.class, "intakeServo");
-        armLeft = hardwareMap.get(DcMotor.class, "armLeft");
-        armRight = hardwareMap.get(DcMotor.class, "armRight");
-        armSwing = hardwareMap.get(DcMotor.class, "armSwing");
-        double motorPower;
+        armLeft    = hardwareMap.get(DcMotor.class, "armLeft");
+        armRight   = hardwareMap.get(DcMotor.class, "armRight");
+        armSwing   = hardwareMap.get(DcMotor.class, "armSwing");
 
         // Initialize arm motors and attempt to check for encoder functionality
         checkEncoderConnection(armLeft, "armLeft");
@@ -60,9 +62,12 @@ public class MecanumDriveBasic extends OpMode {
 
     private void checkEncoderConnection(DcMotor motor, String motorName) {
         try {
+            // Reverse the right motor if needed
             armRight.setDirection(DcMotor.Direction.REVERSE);
+
             motor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
             motor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
             int initialPosition = motor.getCurrentPosition();
 
             // Set power briefly to check if encoder changes
@@ -74,9 +79,15 @@ public class MecanumDriveBasic extends OpMode {
             if (initialPosition != newPosition) {
                 telemetry.addData(motorName, "Encoder detected");
                 switch (motorName) {
-                    case "armLeft": armLeftHasEncoder = true; break;
-                    case "armRight": armRightHasEncoder = true; break;
-                    case "armSwing": armSwingHasEncoder = true; break;
+                    case "armLeft":
+                        armLeftHasEncoder = true;
+                        break;
+                    case "armRight":
+                        armRightHasEncoder = true;
+                        break;
+                    case "armSwing":
+                        armSwingHasEncoder = true;
+                        break;
                 }
             } else {
                 telemetry.addData(motorName, "No encoder detected");
@@ -84,6 +95,7 @@ public class MecanumDriveBasic extends OpMode {
         } catch (Exception e) {
             telemetry.addData(motorName, "Error: Encoder not detected");
         }
+
         motor.setPower(0);
         motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER); // Reset to basic power mode
     }
@@ -95,17 +107,20 @@ public class MecanumDriveBasic extends OpMode {
 
     @Override
     public void loop() {
-        // Drive control using gamepad 1
-        double drive = gamepad1.left_stick_x;
-        double strafe = -gamepad1.right_stick_x;
-        double turn = -gamepad1.left_stick_y;
+        // ----------------------
+        // Drive (gamepad1)
+        // ----------------------
+        double drive  =  gamepad1.left_stick_x;    // X-axis
+        double strafe = -gamepad1.right_stick_x;   // X-axis (negated)
+        double turn   = -gamepad1.left_stick_y;    // Y-axis (negated)
 
         Vector2d velocity = new Vector2d(strafe, drive);
         PoseVelocity2d powers = new PoseVelocity2d(velocity, turn);
-
         mecanumDrive.setDrivePowers(powers);
 
-        // Intake control using gamepad 2 triggers
+        // ----------------------
+        // Intake (gamepad2 triggers)
+        // ----------------------
         if (gamepad2.left_trigger > 0.1) {
             intakeServo.setPower(1.0);
         } else if (gamepad2.right_trigger > 0.1) {
@@ -114,19 +129,13 @@ public class MecanumDriveBasic extends OpMode {
             intakeServo.setPower(0.0);
         }
 
-        // check if the preset was pressed for the linear slides
-        if (gamepad2.right_bumper) {
-            armRight.setTargetPosition(ARM_RIGHT_LIN_SLIDE_BUCKET);
-            armLeft.setTargetPosition(ARM_LEFT_LIN_SLIDE_BUCKET);
-        }
-
-        // Arm control using gamepad 2 right joystick
-        // chatgpt wrote this lol
+        // ----------------------
+        // Linear slides (armLeft, armRight)
+        // Use right joystick (gamepad2.right_stick_y) + right bumper
+        // ----------------------
         if (armLeftHasEncoder && armRightHasEncoder) {
-            // We have encoders on both slides
-
             if (gamepad2.right_bumper) {
-                // Move to bucket position
+                // Move to "bucket" position
                 armLeft.setTargetPosition(ARM_LEFT_LIN_SLIDE_BUCKET);
                 armRight.setTargetPosition(ARM_RIGHT_LIN_SLIDE_BUCKET);
 
@@ -135,10 +144,10 @@ public class MecanumDriveBasic extends OpMode {
 
                 armLeft.setPower(0.5);
                 armRight.setPower(0.5);
-
             } else {
-                // If right bumper is not pressed, read the joystick and move slides
-                int deltaPosition = (int)(-gamepad2.right_stick_y * 100);
+                // Manual via joystick
+                int deltaPosition = (int) (-gamepad2.right_stick_y * 100);
+
                 armLeft.setTargetPosition(armLeft.getCurrentPosition() + deltaPosition);
                 armRight.setTargetPosition(armRight.getCurrentPosition() + deltaPosition);
 
@@ -148,133 +157,103 @@ public class MecanumDriveBasic extends OpMode {
                 armLeft.setPower(0.5);
                 armRight.setPower(0.5);
             }
-
         } else {
-            // If one or both arms do NOT have encoders, fall back to simple power
+            // If no encoders, just set power directly
             double armPower = gamepad2.right_stick_y;
             armLeft.setPower(armPower);
             armRight.setPower(armPower);
         }
 
+        // ----------------------
+        // Arm swing (armSwing) with presets
+        // gamepad2.left_stick_y for manual adjustments
+        // gamepad2.b / y / x / a for presets
+        // ----------------------
 
-
-        // Arm swing control with position targeting if encoder detected
-        double armSwingInput = -gamepad2.left_stick_y;
-        int positionIncrement = (int)(armSwingInput * 10);
-        armSwingTargetPosition += positionIncrement;
-        armSwingTargetPosition = Math.max(SWING_MIN_POSITION, Math.min(SWING_MAX_POSITION, armSwingTargetPosition));
-
-        // Initialize motorPower (default to 0.0)
-        double motorPower = 0.0;
+        // --- CHANGES START HERE ---
+        // 1) Remove the "shortest direction" logic.
+        // 2) Set the arm target directly to "armSwingTargetPosition".
+        // 3) Use RUN_TO_POSITION with a simple power approach.
 
         if (armSwingHasEncoder) {
-            int currentPosition = armSwing.getCurrentPosition();
-
-            // Calculate shortest direction to move the arm (optimize direction)
-            int delta = armSwingTargetPosition - currentPosition;
-            if (delta > 180) {
-                // Move counter-clockwise (decrease the position)
-                delta -= 360;
-            } else if (delta < -180) {
-                // Move clockwise (increase the position)
-                delta += 360;
+            // Check if user pressed any preset button
+            if (gamepad2.b) {
+                armSwingTargetPosition = ARM_SWING_FLOOR;           // -3168
+            } else if (gamepad2.y) {
+                armSwingTargetPosition = ARM_SWING_CEIL;            // -2112
+            } else if (gamepad2.x) {
+                armSwingTargetPosition = ARM_SWING_STORAGE_POSITION; // 0
+            } else if (gamepad2.a) {
+                armSwingTargetPosition = ARM_SWING_EXIT_ENTRY_POSITION; // -2768
             }
 
-            armSwing.setTargetPosition(currentPosition + delta);
+            // Add manual increments from left stick
+            double armSwingInput = -gamepad2.left_stick_y;
+            int positionIncrement = (int) (armSwingInput * 10);
+            armSwingTargetPosition += positionIncrement;
 
-            // Calculate the distance to the target position
-            int distanceToTarget = Math.abs(armSwingTargetPosition - currentPosition);
+            // Clip it to extremes (safety)
+            armSwingTargetPosition = Math.max(SWING_MIN_POSITION,
+                    Math.min(SWING_MAX_POSITION, armSwingTargetPosition));
 
-            // Determine the motor power based on the distance to the target
-            if (distanceToTarget < 200) {
-                motorPower = 0.5; // Move slower when close
-            } else if (distanceToTarget < 2000) {
-                motorPower = 0.7; // Move at a medium speed
+            // Set the target position directly (no more ±180° logic)
+            armSwing.setTargetPosition(armSwingTargetPosition);
+
+            // Pick a power. You can do fancy logic or keep it simple.
+            // We'll do a mild approach: if we're more than 1000 ticks away,
+            // use full power; else slow a bit to 0.7
+            int distanceToTarget = Math.abs(armSwing.getCurrentPosition() - armSwingTargetPosition);
+            double motorPower;
+            if (distanceToTarget > 1000) {
+                motorPower = 1.0;
             } else {
-                motorPower = 1.0; // Move faster when far away
+                motorPower = 0.7;
             }
 
             armSwing.setMode(DcMotor.RunMode.RUN_TO_POSITION);
             armSwing.setPower(motorPower);
         } else {
-            armSwing.setPower(armSwingInput); // Manual control if no encoder
+            // If no encoder, just manual
+            double armSwingInput = -gamepad2.left_stick_y;
+            armSwing.setPower(armSwingInput);
         }
+        // --- CHANGES END HERE ---
 
-        // Check for preset position button presses and update the arm swing target
-        if (gamepad2.b) {
-            armSwingTargetPosition = ARM_SWING_FLOOR;
-        } else if (gamepad2.y) {
-            armSwingTargetPosition = ARM_SWING_CEIL;
-        } else if (gamepad2.x) {
-            armSwingTargetPosition = ARM_SWING_STORAGE_POSITION;
-        } else if (gamepad2.a) {
-            armSwingTargetPosition = ARM_SWING_EXIT_ENTRY_POSITION;
-        }
-
-
-        // Arm swing control with preset position targeting
-        if (armSwingHasEncoder) {
-            int currentPosition = armSwing.getCurrentPosition();
-
-            // Calculate shortest direction to move the arm (optimize direction)
-            int delta = armSwingTargetPosition - currentPosition;
-            if (delta > 180) {
-                // Move counter-clockwise (decrease the position)
-                delta -= 360;
-            } else if (delta < -180) {
-                // Move clockwise (increase the position)
-                delta += 360;
-            }
-
-            armSwing.setTargetPosition(currentPosition + delta);
-            armSwing.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            armSwing.setPower(motorPower);  // Apply calculated motor power
-        } else {
-            armSwing.setPower(armSwingInput); // Manual control if no encoder
-        }
-
+        // ----------------------
         // Telemetry
+        // ----------------------
         telemetry.addData("Status", "Running");
         telemetry.addData("Drive Power", drive);
         telemetry.addData("Arm Left Encoder", armLeftHasEncoder);
         telemetry.addData("Arm Right Encoder", armRightHasEncoder);
         telemetry.addData("Arm Swing Encoder", armSwingHasEncoder);
 
-        // Added telemetry to check target and actual arm swing positions
         if (armSwingHasEncoder) {
-            int currentPosition = armSwing.getCurrentPosition();
-            telemetry.addData("Arm Swing Target Position", armSwingTargetPosition);
-            telemetry.addData("Arm Swing Current Position", currentPosition);
+            telemetry.addData("Arm Swing Target Pos", armSwing.getTargetPosition());
+            telemetry.addData("Arm Swing Current Pos", armSwing.getCurrentPosition());
         } else {
-            telemetry.addData("Arm Swing Target Position", "N/A");
-            telemetry.addData("Arm Swing Current Position", "N/A");
+            telemetry.addData("Arm Swing Target Pos", "N/A");
+            telemetry.addData("Arm Swing Current Pos", "N/A");
         }
 
-        // For armLeft (linear slide)
         if (armLeftHasEncoder) {
-            int currentPosition = armLeft.getCurrentPosition();
-            telemetry.addData("Arm Left Target Position", armLeft.getTargetPosition());
-            telemetry.addData("Arm Left Current Position", currentPosition);
+            telemetry.addData("Arm Left Target Pos", armLeft.getTargetPosition());
+            telemetry.addData("Arm Left Current Pos", armLeft.getCurrentPosition());
         } else {
-            telemetry.addData("Arm Left Target Position", "N/A");
-            telemetry.addData("Arm Left Current Position", "N/A");
+            telemetry.addData("Arm Left Target Pos", "N/A");
+            telemetry.addData("Arm Left Current Pos", "N/A");
         }
 
-// For armRight
         if (armRightHasEncoder) {
-            int currentPosition = armRight.getCurrentPosition();
-            telemetry.addData("Arm Right Target Position", armRight.getTargetPosition());
-            telemetry.addData("Arm Right Current Position", currentPosition);
+            telemetry.addData("Arm Right Target Pos", armRight.getTargetPosition());
+            telemetry.addData("Arm Right Current Pos", armRight.getCurrentPosition());
         } else {
-            telemetry.addData("Arm Right Target Position", "N/A");
-            telemetry.addData("Arm Right Current Position", "N/A");
+            telemetry.addData("Arm Right Target Pos", "N/A");
+            telemetry.addData("Arm Right Current Pos", "N/A");
         }
-
 
         telemetry.update();
     }
-
-
 
     @Override
     public void stop() {
@@ -283,6 +262,7 @@ public class MecanumDriveBasic extends OpMode {
         armLeft.setPower(0);
         armRight.setPower(0);
         armSwing.setPower(0);
+
         telemetry.addData("Status", "Stopped");
         telemetry.update();
     }
