@@ -36,6 +36,8 @@ public class MecanumDriveBasic extends OpMode {
 
     private int ARM_LEFT_LIN_SLIDE_BUCKET = 2585;
 
+    private boolean LINEAR_SLIDE_TARGET_REACHED = false;
+
 
     @Override
     public void init() {
@@ -119,15 +121,37 @@ public class MecanumDriveBasic extends OpMode {
         }
 
         // Arm control using gamepad 2 right joystick
-        double armPower = gamepad2.right_stick_y;
+        // chatgpt wrote this lol
         if (armLeftHasEncoder && armRightHasEncoder) {
-            armLeft.setTargetPosition(armLeft.getCurrentPosition() - (int)(armPower * 100));
-            armRight.setTargetPosition(armRight.getCurrentPosition() - (int)(armPower * 100));
-            armLeft.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            armRight.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            armLeft.setPower(0.5);
-            armRight.setPower(0.5);
+            // We have encoders on both slides
+
+            if (gamepad2.right_bumper) {
+                // Move to bucket position
+                armLeft.setTargetPosition(ARM_LEFT_LIN_SLIDE_BUCKET);
+                armRight.setTargetPosition(ARM_RIGHT_LIN_SLIDE_BUCKET);
+
+                armLeft.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                armRight.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+                armLeft.setPower(0.5);
+                armRight.setPower(0.5);
+
+            } else {
+                // If right bumper is not pressed, read the joystick and move slides
+                int deltaPosition = (int)(-gamepad2.right_stick_y * 100);
+                armLeft.setTargetPosition(armLeft.getCurrentPosition() + deltaPosition);
+                armRight.setTargetPosition(armRight.getCurrentPosition() + deltaPosition);
+
+                armLeft.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                armRight.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+                armLeft.setPower(0.5);
+                armRight.setPower(0.5);
+            }
+
         } else {
+            // If one or both arms do NOT have encoders, fall back to simple power
+            double armPower = gamepad2.right_stick_y;
             armLeft.setPower(armPower);
             armRight.setPower(armPower);
         }
