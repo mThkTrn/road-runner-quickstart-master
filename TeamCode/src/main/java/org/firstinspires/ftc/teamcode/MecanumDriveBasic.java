@@ -31,10 +31,10 @@ public class MecanumDriveBasic extends OpMode {
     private int armSwingTargetPosition = 0;
 
     // Arm swing preset positions
-    private int ARM_SWING_FLOOR = -3168;
-    private int ARM_SWING_CEIL = -2112;
-    private int ARM_SWING_STORAGE_POSITION = 0;
-    private int ARM_SWING_EXIT_ENTRY_POSITION = -2768;
+    private int ARM_SWING_FLOOR = -3000; //-3168
+    private int ARM_SWING_CEIL = -1682; // 2112
+    private int ARM_SWING_STORAGE_POSITION = 0; //0
+    private int ARM_SWING_EXIT_ENTRY_POSITION = -2605;
 
     // Linear slide presets
     private int ARM_RIGHT_LIN_SLIDE_BUCKET = 2585;
@@ -135,6 +135,7 @@ public class MecanumDriveBasic extends OpMode {
         // ----------------------
         if (armLeftHasEncoder && armRightHasEncoder) {
             if (gamepad2.right_bumper) {
+
                 // Move to "bucket" position
                 armLeft.setTargetPosition(ARM_LEFT_LIN_SLIDE_BUCKET);
                 armRight.setTargetPosition(ARM_RIGHT_LIN_SLIDE_BUCKET);
@@ -144,6 +145,7 @@ public class MecanumDriveBasic extends OpMode {
 
                 armLeft.setPower(0.5);
                 armRight.setPower(0.5);
+
             } else {
                 // Manual via joystick
                 int deltaPosition = (int) (-gamepad2.right_stick_y * 100);
@@ -177,13 +179,13 @@ public class MecanumDriveBasic extends OpMode {
 
         if (armSwingHasEncoder) {
             // Check if user pressed any preset button
-            if (gamepad2.b) {
+            if (gamepad2.a) {
                 armSwingTargetPosition = ARM_SWING_FLOOR;           // -3168
             } else if (gamepad2.y) {
                 armSwingTargetPosition = ARM_SWING_CEIL;            // -2112
             } else if (gamepad2.x) {
                 armSwingTargetPosition = ARM_SWING_STORAGE_POSITION; // 0
-            } else if (gamepad2.a) {
+            } else if (gamepad2.b) {
                 armSwingTargetPosition = ARM_SWING_EXIT_ENTRY_POSITION; // -2768
             }
 
